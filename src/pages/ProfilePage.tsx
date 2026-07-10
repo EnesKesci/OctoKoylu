@@ -10,8 +10,8 @@ export default function ProfilePage() {
 
   return (
     <main>
-      <h1 className="text-2xl font-semibold">Profile</h1>
-      <p className="mt-2 text-slate-300">Set up your profile</p>
+      <h1 className="text-2xl font-semibold">Profil</h1>
+      <p className="mt-2 text-slate-300">Profil bilgilerinizi buradan düzenleyebilirsiniz.</p>
       <div className="mt-4">
         <ProfileForm onSave={onSave} />
       </div>
