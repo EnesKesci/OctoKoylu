@@ -3,12 +3,10 @@ import { persist } from 'zustand/middleware'
 
 export interface Profile {
   displayName: string
-  avatarUrl?: string
 }
 
 export interface ProfileState {
   displayName: string
-  avatarUrl?: string
   setProfile: (profile: Profile) => void
   clearProfile: () => void
 }
@@ -20,15 +18,36 @@ export const useProfileStore = create<ProfileState>()(
   persist(
     (set) => ({
       displayName: '',
-      avatarUrl: undefined,
       setProfile: (profile: Profile) => {
         const trimmed = profile.displayName.trim()
-        set(() => ({ displayName: trimmed, avatarUrl: profile.avatarUrl?.trim() || undefined }))
+        set(() => ({ displayName: trimmed }))
       },
-      clearProfile: () => set(() => ({ displayName: '', avatarUrl: undefined })),
+      clearProfile: () => set(() => ({ displayName: '' })),
     }),
     {
       name: 'octokoylu-profile',
+      version: 1,
+      partialize: (state) => ({ displayName: state.displayName }),
+      migrate: (persistedState) => {
+        // persistedState may be anything (unknown) from localStorage — handle safely
+        try {
+          if (!persistedState || typeof persistedState !== 'object') {
+            return { displayName: '' }
+          }
+
+          const p = persistedState as Record<string, unknown>
+          const maybeDisplayName = p.displayName
+
+          if (typeof maybeDisplayName === 'string') {
+            return { displayName: maybeDisplayName.trim() }
+          }
+
+          return { displayName: '' }
+        } catch (e) {
+          // In case of any unexpected runtime issue, fall back to empty displayName
+          return { displayName: '' }
+        }
+      },
     },
   ),
 )

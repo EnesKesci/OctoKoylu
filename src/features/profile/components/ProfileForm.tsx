@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { getInitials } from '@/shared/lib/getInitials'
 
 
 type Props = {
@@ -16,12 +17,10 @@ type Props = {
 
 export default function ProfileForm({ onSave }: Props) {
   const currentName = useProfileStore((s) => s.displayName)
-  const currentAvatar = useProfileStore((s) => s.avatarUrl)
   const setProfile = useProfileStore((s) => s.setProfile)
   const clearProfile = useProfileStore((s) => s.clearProfile)
 
   const [displayName, setDisplayName] = useState(currentName)
-  const [avatarUrl, setAvatarUrl] = useState(currentAvatar ?? '')
   const [error, setError] = useState<string | null>(null)
 
   function onNameChange(e: ChangeEvent<HTMLInputElement>) {
@@ -32,14 +31,9 @@ export default function ProfileForm({ onSave }: Props) {
     }
   }
 
-  function onAvatarChange(e: ChangeEvent<HTMLInputElement>) {
-    setAvatarUrl(e.target.value)
-  }
-
   function onClear() {
     clearProfile()
     setDisplayName('')
-    setAvatarUrl('')
   }
 
   function onSubmit(e: FormEvent) {
@@ -51,24 +45,23 @@ export default function ProfileForm({ onSave }: Props) {
     }
 
     const profile: Profile = { displayName: trimmed }
-    if (avatarUrl.trim().length > 0) profile.avatarUrl = avatarUrl.trim()
 
     setProfile(profile)
     onSave?.()
   }
 
-  const initial = displayName?.charAt(0)?.toUpperCase() || ''
+  const initials = getInitials(displayName)
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
           <Avatar>
-            {avatarUrl ? <AvatarImage src={avatarUrl} alt={`${displayName} avatar`} /> : <AvatarFallback>{initial}</AvatarFallback>}
+            <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div>
             <CardTitle>Profil Bilgileri</CardTitle>
-            <CardDescription>Kullanıcı adınızı girin ve isterseniz avatar URL ekleyin.</CardDescription>
+            <CardDescription>Kullanıcı adınızı girin.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -83,11 +76,6 @@ export default function ProfileForm({ onSave }: Props) {
               aria-invalid={!!error}
             />
             {error ? <p className="mt-1 text-xs text-rose-400">{error}</p> : null}
-          </div>
-
-          <div>
-            <Label>Avatar URL (isteğe bağlı)</Label>
-            <Input value={avatarUrl} onChange={onAvatarChange} placeholder="https://..." />
           </div>
 
           <CardFooter>

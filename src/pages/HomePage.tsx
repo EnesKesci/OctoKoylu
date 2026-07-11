@@ -2,11 +2,11 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useProfileStore, selectHasProfile } from '../features/profile/store/profileStore'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { getInitials } from '@/shared/lib/getInitials'
 
 export default function HomePage() {
   const displayName = useProfileStore((s) => s.displayName)
-  const avatarUrl = useProfileStore((s) => s.avatarUrl)
   const hasProfile = useProfileStore(selectHasProfile)
   const navigate = useNavigate()
 
@@ -14,14 +14,14 @@ export default function HomePage() {
     return <Navigate to="/profile" replace />
   }
 
-  const initial = displayName?.charAt(0)?.toUpperCase() || ''
+  const initials = getInitials(displayName)
 
   return (
     <main>
       <Card className="p-6">
         <div className="flex items-center gap-4">
           <Avatar>
-            {avatarUrl ? <AvatarImage src={avatarUrl} alt={`${displayName} avatar`} /> : <AvatarFallback>{initial}</AvatarFallback>}
+            <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div>
             <h1 className="text-2xl font-semibold">Hoş geldiniz, {displayName}</h1>
