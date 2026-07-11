@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import type { Profile } from '../store/profileStore'
 import { useProfileStore } from '../store/profileStore'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { getProfile, createProfile, updateProfile } from '@/features/profile/api/profileApi'
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -18,10 +19,25 @@ type Props = {
 export default function ProfileForm({ onSave }: Props) {
   const currentName = useProfileStore((s) => s.displayName)
   const setProfile = useProfileStore((s) => s.setProfile)
-  const clearProfile = useProfileStore((s) => s.clearProfile)
+  const { user } = useAuth()
 
   const [displayName, setDisplayName] = useState(currentName)
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState<boolean>(false)
+  const mountedRef = useRef(true)
+  const isSubmittingRef = useRef(false)
+
+  useEffect(() => {
+    // keep local input in sync with store when store changes externally
+    setDisplayName(currentName)
+  }, [currentName])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   function onNameChange(e: ChangeEvent<HTMLInputElement>) {
     const v = e.target.value
@@ -32,22 +48,63 @@ export default function ProfileForm({ onSave }: Props) {
   }
 
   function onClear() {
-    clearProfile()
+    if (isSaving) return
+    // Only clear local input and error — do not modify persisted or server profile
     setDisplayName('')
+    setError(null)
   }
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (isSubmittingRef.current) return
+
     const trimmed = displayName.trim()
-    if (trimmed.length === 0) {
-      setError('İsim gerekli')
+    if (trimmed.length < 2) {
+      setError('İsim en az 2 karakter olmalı.')
+      return
+    }
+    if (trimmed.length > 40) {
+      setError('İsim en fazla 40 karakter olabilir.')
       return
     }
 
-    const profile: Profile = { displayName: trimmed }
+    if (!user) {
+      setError('Authenticated user is unavailable.')
+      return
+    }
 
-    setProfile(profile)
-    onSave?.()
+    // Acquire submission lock and update UI state
+    isSubmittingRef.current = true
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      // Check if profile exists
+      const existing = await getProfile(user.id)
+
+      let savedProfile
+      if (existing) {
+        savedProfile = await updateProfile({ userId: user.id, displayName: trimmed })
+      } else {
+        savedProfile = await createProfile({ userId: user.id, displayName: trimmed })
+      }
+
+      if (!mountedRef.current) return
+
+      // Update Zustand with server-authoritative displayName
+      setProfile({ displayName: savedProfile.displayName })
+      setDisplayName(savedProfile.displayName)
+
+      onSave?.()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Profil kaydedilirken bilinmeyen bir hata oluştu.'
+      if (!mountedRef.current) return
+      setError(message)
+    } finally {
+      // Release submission lock regardless of mount state
+      isSubmittingRef.current = false
+      if (mountedRef.current) setIsSaving(false)
+    }
   }
 
   const initials = getInitials(displayName)
@@ -80,8 +137,10 @@ export default function ProfileForm({ onSave }: Props) {
 
           <CardFooter>
             <div className="flex items-center gap-3 w-full">
-              <Button type="submit">Kaydet</Button>
-              <Button type="button" variant="outline" onClick={onClear}>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClear} disabled={isSaving}>
                 Temizle
               </Button>
             </div>
