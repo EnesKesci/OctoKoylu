@@ -7,6 +7,7 @@ export interface Room {
   roomCode: string
   name: string
   status: RoomStatus
+  moderatorId: string | null
 }
 
 interface RoomRow {
@@ -14,6 +15,7 @@ interface RoomRow {
   room_code: string
   name: string
   status: RoomStatus
+  moderator_id?: string | null
 }
 
 interface CreateRoomRow extends RoomRow {}
@@ -28,6 +30,7 @@ function mapCreateRoomRow(row: CreateRoomRow): Room {
     roomCode: row.room_code,
     name: row.name,
     status: row.status,
+    moderatorId: (row as RoomRow).moderator_id ?? null,
   }
 }
 
@@ -37,6 +40,7 @@ function mapRoomRow(row: RoomRow): Room {
     roomCode: row.room_code,
     name: row.name,
     status: row.status,
+    moderatorId: row.moderator_id ?? null,
   }
 }
 
@@ -102,7 +106,7 @@ export async function createRoom(input: CreateRoomInput): Promise<Room> {
 export async function getRoomByCode(roomCode: string): Promise<Room | null> {
   const { data, error } = await supabase
     .from('rooms')
-    .select('id, name, room_code, status')
+    .select('id, name, room_code, status, moderator_id')
     .eq('room_code', roomCode)
     .maybeSingle()
 

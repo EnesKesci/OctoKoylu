@@ -125,18 +125,25 @@ export default function ModeratorPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {players.map((p) => (
-              <div key={p.id} className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>{(p.displayName ?? '–').slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="font-medium">{p.displayName ?? 'Bilinmeyen'}</div>
-                  <div className="text-xs text-slate-400">{p.joinedAt ?? ''}</div>
+            {players.map((p) => {
+              const isModerator = room?.moderatorId != null && p.userId === room.moderatorId
+              return (
+                <div key={p.id} className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>{(p.displayName ?? '–').slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="font-medium">{p.displayName ?? 'Bilinmeyen'}</div>
+                    <div className="text-xs text-slate-400">{p.joinedAt ?? ''}</div>
+                  </div>
+                  {isModerator ? (
+                    <div className="text-sm text-indigo-300 font-medium">Moderatör</div>
+                  ) : (
+                    <div className="text-sm text-slate-300">{p.isReady ? 'Hazır' : 'Bekliyor'}</div>
+                  )}
                 </div>
-                <div className="text-sm text-slate-300">{p.isReady ? 'Hazır' : 'Bekliyor'}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </CardContent>
       </Card>
