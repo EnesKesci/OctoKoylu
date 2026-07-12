@@ -1,11 +1,109 @@
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+
+import { getRoomByCode, getRoomPlayers } from '@/features/rooms/api/roomApi'
+import type { Room, Player } from '@/features/rooms/api/roomApi'
+
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 export default function ModeratorPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [room, setRoom] = useState<Room | null>(null)
+  const [players, setPlayers] = useState<Player[]>([])
+
+  useEffect(() => {
+    let mounted = true
+
+    async function load() {
+      if (!roomCode) {
+        if (mounted) {
+          setError('Oda kodu eksik.')
+          setIsLoading(false)
+        }
+        return
+      }
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const r = await getRoomByCode(roomCode)
+        if (!mounted) return
+
+        if (!r) {
+          setRoom(null)
+          setPlayers([])
+          setError(null)
+          setIsLoading(false)
+          return
+        }
+
+        setRoom(r)
+
+        const ps = await getRoomPlayers(r.id)
+        if (!mounted) return
+
+        setPlayers(ps)
+        setIsLoading(false)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Oda yüklenirken bilinmeyen bir hata oluştu.'
+        if (!mounted) return
+        setError(message)
+        setIsLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      mounted = false
+    }
+  }, [roomCode])
+
+  if (isLoading) {
+    return <p className="p-4">Oda yükleniyor...</p>
+  }
+
+  if (error) {
+    return <p className="p-4 text-rose-400">{error}</p>
+  }
+
+  if (!room) {
+    return <p className="p-4">Oda bulunamadı.</p>
+  }
+
   return (
-    <main>
-      <h1 className="text-2xl font-semibold">Moderator</h1>
-      <p className="mt-2 text-slate-300">Moderator view for room: {roomCode ?? 'unknown'}</p>
-    </main>
+    <div className="p-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{room.name}</CardTitle>
+              <CardDescription>Kod: {room.roomCode}</CardDescription>
+            </div>
+            <div className="ml-4 px-2 py-1 rounded bg-slate-800 text-sm">{players.length} oyuncu</div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {players.map((p) => (
+              <div key={p.id} className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback>{(p.displayName ?? '–').slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="font-medium">{p.displayName ?? 'Bilinmeyen'}</div>
+                  <div className="text-xs text-slate-400">{p.joinedAt ?? ''}</div>
+                </div>
+                <div className="text-sm text-slate-300">{p.isReady ? 'Hazır' : 'Bekliyor'}</div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
