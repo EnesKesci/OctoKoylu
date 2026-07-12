@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { getRoomByCode, getRoomPlayers } from '@/features/rooms/api/roomApi'
 import type { Room, Player } from '@/features/rooms/api/roomApi'
+import { supabase } from '@/shared/lib/supabase'
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -62,6 +63,41 @@ export default function ModeratorPage() {
       mounted = false
     }
   }, [roomCode])
+
+  // Realtime subscription for room_players of this room
+  useEffect(() => {
+    if (!room) return
+
+    let mounted = true
+    const isRefetchingRef = { current: false }
+
+    const channel = supabase
+      .channel(`room_players:${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${room.id}` },
+        async () => {
+          if (!mounted) return
+          if (isRefetchingRef.current) return
+          isRefetchingRef.current = true
+          try {
+            const ps = await getRoomPlayers(room.id)
+            if (!mounted) return
+            setPlayers(ps)
+          } catch {
+            // keep existing players on realtime failure
+          } finally {
+            isRefetchingRef.current = false
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      void supabase.removeChannel(channel)
+    }
+  }, [room])
 
   if (isLoading) {
     return <p className="p-4">Oda yükleniyor...</p>
