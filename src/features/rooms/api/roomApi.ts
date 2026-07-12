@@ -18,7 +18,7 @@ interface RoomRow {
   moderator_id?: string | null
 }
 
-interface CreateRoomRow extends RoomRow {}
+interface CreateRoomRow extends RoomRow { }
 
 export interface CreateRoomInput {
   name: string
@@ -268,3 +268,4 @@ export async function updateReadyStatus(input: UpdateReadyStatusInput): Promise<
     throw createRoomApiError('Failed to update ready status.', error.message)
   }
 }
+

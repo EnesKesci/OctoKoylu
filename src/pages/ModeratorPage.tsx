@@ -166,7 +166,7 @@ export default function ModeratorPage() {
           </div>
           {showRolePanel && (
             <div className="mt-4">
-              <RoleConfigurationPanel playerCount={totalReadyPlayers} onClose={() => setShowRolePanel(false)} />
+              <RoleConfigurationPanel roomId={room.id} playerCount={totalReadyPlayers} onClose={() => setShowRolePanel(false)} />
             </div>
           )}
           <div className="space-y-3">
