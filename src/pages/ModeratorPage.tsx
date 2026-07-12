@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { getRoomByCode, getRoomPlayers, kickPlayer } from '@/features/rooms/api/roomApi'
 import type { Room, Player } from '@/features/rooms/api/roomApi'
+import { RoleConfigurationPanel } from '@/features/roles/components/RoleConfigurationPanel'
 import { supabase } from '@/shared/lib/supabase'
 
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ export default function ModeratorPage() {
   const [room, setRoom] = useState<Room | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [kickingPlayerIds, setKickingPlayerIds] = useState<string[]>([])
+  const [showRolePanel, setShowRolePanel] = useState<boolean>(false)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -157,11 +159,16 @@ export default function ModeratorPage() {
               </div>
             </div>
             <div className="mt-4">
-              <Button type="button" disabled={!canDistributeRoles} onClick={() => console.log('Role assignment coming soon')}>
+              <Button type="button" disabled={!canDistributeRoles} onClick={() => setShowRolePanel(true)}>
                 Rolleri Dağıt
               </Button>
             </div>
           </div>
+          {showRolePanel && (
+            <div className="mt-4">
+              <RoleConfigurationPanel playerCount={totalReadyPlayers} onClose={() => setShowRolePanel(false)} />
+            </div>
+          )}
           <div className="space-y-3">
             {players.map((p) => {
               const isModerator = room?.moderatorId != null && p.userId === room.moderatorId
