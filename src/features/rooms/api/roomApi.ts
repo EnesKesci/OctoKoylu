@@ -210,3 +210,61 @@ export async function joinRoom(input: JoinRoomInput): Promise<Room> {
 
   return room
 }
+
+export interface LeaveRoomInput {
+  roomId: string
+  userId: string
+}
+
+export async function leaveRoom(input: LeaveRoomInput): Promise<void> {
+  const { roomId, userId } = input
+
+  const { error } = await supabase
+    .from('room_players')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw createRoomApiError('Failed to leave room.', error.message)
+  }
+}
+
+export interface KickPlayerInput {
+  roomId: string
+  playerUserId: string
+}
+
+export async function kickPlayer(input: KickPlayerInput): Promise<void> {
+  const { roomId, playerUserId } = input
+
+  const { error } = await supabase
+    .from('room_players')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('user_id', playerUserId)
+
+  if (error) {
+    throw createRoomApiError('Failed to remove player from room.', error.message)
+  }
+}
+
+export interface UpdateReadyStatusInput {
+  roomId: string
+  userId: string
+  isReady: boolean
+}
+
+export async function updateReadyStatus(input: UpdateReadyStatusInput): Promise<void> {
+  const { roomId, userId, isReady } = input
+
+  const { error } = await supabase
+    .from('room_players')
+    .update({ is_ready: isReady })
+    .eq('room_id', roomId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw createRoomApiError('Failed to update ready status.', error.message)
+  }
+}
