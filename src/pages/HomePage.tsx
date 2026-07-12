@@ -31,6 +31,7 @@ export default function HomePage() {
 
         <div className="mt-6 flex flex-col gap-3">
           <Button onClick={() => navigate('/rooms/create')} variant="default">Oda Oluştur</Button>
+          <Button onClick={() => navigate('/rooms/join')} variant="default">Odaya Katıl</Button>
           <Button onClick={() => navigate('/profile')} variant="secondary">
             Profili Düzenle
           </Button>

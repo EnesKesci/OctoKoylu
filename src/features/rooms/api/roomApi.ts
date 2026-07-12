@@ -130,3 +130,79 @@ export async function getRoomPlayers(roomId: string): Promise<Player[]> {
 
   return (data as PlayerRow[]).map(mapPlayerRow)
 }
+
+// --- joinRoom implementation ---
+
+export interface JoinRoomInput {
+  roomCode: string
+  userId: string
+}
+
+export async function joinRoom(input: JoinRoomInput): Promise<Room> {
+  const rawCode = input.roomCode ?? ''
+  const userId = input.userId
+
+  const code = rawCode.trim().toUpperCase()
+  // Validate code: exactly 6 chars, A-Z0-9
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    throw new Error('Invalid room code.')
+  }
+
+  // Find room and ensure it's in lobby status
+  const room = await getRoomByCode(code)
+  if (!room || room.status !== 'lobby') {
+    throw new Error('Room not found or is no longer accepting players.')
+  }
+
+  // Load user's profile display name
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profileError) {
+    throw createRoomApiError('Failed to join room.', profileError.message)
+  }
+
+  if (!profileData || !profileData.display_name || profileData.display_name.trim().length === 0) {
+    throw new Error('Profile is required before joining a room.')
+  }
+
+  const displayName: string = profileData.display_name
+
+  // Check if user already in room
+  const { data: existingPlayer, error: existingError } = await supabase
+    .from('room_players')
+    .select('id')
+    .eq('room_id', room.id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (existingError) {
+    throw createRoomApiError('Failed to join room.', existingError.message)
+  }
+
+  if (existingPlayer) {
+    // Already a member — treat as success
+    return room
+  }
+
+  // Insert new room player
+  const { error: insertError } = await supabase
+    .from('room_players')
+    .insert({
+      room_id: room.id,
+      user_id: userId,
+      display_name: displayName,
+      is_ready: false,
+    })
+
+  if (insertError) {
+    // If duplicate constraint from a race occurs, consider operation successful
+    const msg = insertError.message ?? undefined
+    throw createRoomApiError('Failed to join room.', msg)
+  }
+
+  return room
+}
