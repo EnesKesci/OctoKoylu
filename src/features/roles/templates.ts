@@ -16,9 +16,9 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     playerCount: 6,
     name: '6 Oyuncu - Varsayılan',
     roles: [
-      { roleCode: 'villager', count: 3 },
+      { roleCode: 'villager', count: 4 },
       { roleCode: 'doctor', count: 1 },
-      { roleCode: 'vampire', count: 2 },
+      { roleCode: 'vampire', count: 1 },
     ],
   },
   {

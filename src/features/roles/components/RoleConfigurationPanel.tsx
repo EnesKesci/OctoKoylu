@@ -217,7 +217,7 @@ export function RoleConfigurationPanel({ roomId, playerCount, players, onPreview
   return (
     <Card className="border-slate-700 bg-slate-900">
       <CardHeader>
-        <CardTitle>Rol Konfigürasyonu</CardTitle>
+        <CardTitle className='text-white'>Rol Konfigürasyonu</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>

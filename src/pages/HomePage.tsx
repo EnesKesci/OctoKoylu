@@ -25,7 +25,7 @@ export default function HomePage() {
           </Avatar>
           <div>
             <h1 className="text-2xl font-semibold">Hoş geldiniz, {displayName}</h1>
-            <p className="mt-2 text-slate-300">Hazırsanız bir oda oluşturabilirsiniz.</p>
+            <p className="mt-2 text-slate-300">Hazırsanız bir oda oluşturabilir veya bir odaya katılabilirsiniz.</p>
           </div>
         </div>
 

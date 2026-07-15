@@ -14,7 +14,7 @@ export function RoleAssignmentPreview({ assignments, error, onRedistribute, onBa
     return (
         <Card className="border-slate-700 bg-slate-900">
             <CardHeader>
-                <CardTitle>Rol Dağıtımı Ön İzleme</CardTitle>
+                <CardTitle className='text-white'>Rol Dağıtımı Ön İzleme</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">

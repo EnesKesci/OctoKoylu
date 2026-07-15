@@ -12,6 +12,8 @@ import { supabase } from '@/shared/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { ROOM_STATUS_LABELS } from '@/features/rooms/status'
+import { formatTime } from '@/shared/lib/fotmatTime'
 
 interface DevelopmentPlayer {
   id: string
@@ -298,16 +300,12 @@ export default function ModeratorPage() {
               <CardTitle>{room.name}</CardTitle>
               <CardDescription>Kod: {room.roomCode}</CardDescription>
             </div>
-            <div className="ml-4 px-2 py-1 rounded bg-slate-800 text-sm">{players.length} oyuncu</div>
+            <div className="ml-4 px-2 py-1 rounded bg-slate-800 text-sm text-slate-400">{players.length} kişi</div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 rounded border border-slate-700 bg-slate-950 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-slate-400">Toplam kişi</p>
-                <p className="text-lg font-semibold text-white">{players.length}</p>
-              </div>
               <div className="space-y-1">
                 <p className="text-sm text-slate-400">Hazır</p>
                 <p className="text-lg font-semibold text-white">
@@ -316,7 +314,7 @@ export default function ModeratorPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-slate-400">Durum</p>
-                <p className="text-lg font-semibold capitalize text-white">{room.status}</p>
+                <p className="text-lg font-semibold capitalize text-white">{ROOM_STATUS_LABELS[room.status]}</p>
               </div>
             </div>
             <div className="mt-4">
@@ -426,6 +424,7 @@ export default function ModeratorPage() {
               const isModerator = room?.moderatorId != null && p.userId === room.moderatorId
               const playerId = p.userId
               const isKicking = playerId ? kickingPlayerIds.includes(playerId) : false
+              const joinedAt = formatTime(p.joinedAt)
 
               return (
                 <div key={p.id} className="flex items-center gap-3">
@@ -434,7 +433,11 @@ export default function ModeratorPage() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="font-medium">{p.displayName ?? 'Bilinmeyen'}</div>
-                    <div className="text-xs text-slate-400">{p.joinedAt ?? ''}</div>
+                    {joinedAt && (
+                      <div className="text-xs text-slate-400">
+                        {joinedAt}'de odaya katıldı
+                      </div>
+                    )}
                   </div>
                   {isModerator ? (
                     <div className="text-sm text-indigo-300 font-medium">Moderatör</div>

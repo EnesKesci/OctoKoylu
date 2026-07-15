@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { getInitials } from '@/shared/lib/getInitials'
+import { formatTime } from '@/shared/lib/fotmatTime'
 
 export default function LobbyPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
@@ -295,7 +296,7 @@ export default function LobbyPage() {
               <CardTitle>{room.name}</CardTitle>
               <CardDescription>Kod: {room.roomCode}</CardDescription>
             </div>
-            <div className="ml-4 px-2 py-1 rounded bg-slate-800 text-sm">{players.length} oyuncu</div>
+            <div className="ml-4 px-2 py-1 rounded bg-slate-800 text-sm text-slate-400">{players.length} kişi</div>
           </div>
         </CardHeader>
         <CardContent>
@@ -305,6 +306,7 @@ export default function LobbyPage() {
           </div>
           <div className="space-y-3">
             {players.map((p) => {
+              const joinedAt = formatTime(p.joinedAt)
               const isModeratorPlayer = room?.moderatorId != null && p.userId === room.moderatorId
               return (
                 <div key={p.id} className="flex items-center gap-3">
@@ -313,7 +315,11 @@ export default function LobbyPage() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="font-medium">{p.displayName ?? 'Bilinmeyen'}</div>
-                    <div className="text-xs text-slate-400">{p.joinedAt ?? ''}</div>
+                    {joinedAt && (
+                      <div className="text-xs text-slate-400">
+                        {joinedAt}'de odaya katıldı
+                      </div>
+                    )}
                   </div>
                   {isModeratorPlayer ? (
                     <div className="text-sm text-indigo-300 font-medium">Moderatör</div>
