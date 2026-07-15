@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { getDefaultRoleConfiguration, ROLE_CATALOG } from '@/features/roles'
-import type { RoleCode } from '@/features/roles'
+import { getDefaultRoleConfiguration, ROLE_CATALOG, createRoleAssignments } from '@/features/roles'
+import type { RoleCode, RoleAssignmentPlayer, RoleAssignment, RoleTemplateItem } from '@/features/roles'
 import { getRoomRoleConfiguration, saveRoomRoleConfiguration } from '@/features/rooms/api/roomRoleConfigurationApi'
 
 interface RoleConfigurationPanelProps {
   roomId: string
   playerCount: number
+  players: RoleAssignmentPlayer[]
+  onPreview: (assignments: RoleAssignment[], roles: RoleTemplateItem[]) => void
   onClose: () => void
 }
 
@@ -16,7 +18,7 @@ interface RoleState {
   count: number
 }
 
-export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleConfigurationPanelProps) {
+export function RoleConfigurationPanel({ roomId, playerCount, players, onPreview, onClose }: RoleConfigurationPanelProps) {
   const [roles, setRoles] = useState<RoleState[]>([])
   const [config, setConfig] = useState<ReturnType<typeof getDefaultRoleConfiguration> | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -24,6 +26,7 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isLoadingConfiguration, setIsLoadingConfiguration] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -141,6 +144,7 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
   function handleDecrement(roleCode: RoleCode) {
     setSaveSuccess(false)
     setSaveError(null)
+    setPreviewError(null)
     setRoles((prev) =>
       prev.map((item) =>
         item.roleCode === roleCode ? { ...item, count: Math.max(0, item.count - 1) } : item,
@@ -151,6 +155,7 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
   function handleIncrement(roleCode: RoleCode) {
     setSaveSuccess(false)
     setSaveError(null)
+    setPreviewError(null)
     const roleDef = ROLE_CATALOG[roleCode]
     if (!roleDef) return
 
@@ -190,6 +195,22 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
       setSaveError(message ? `Rol konfigürasyonu kaydedilemedi. ${message}` : 'Rol konfigürasyonu kaydedilemedi.')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  function handlePreview() {
+    setPreviewError(null)
+
+    const activeRoles = roles
+      .filter((role) => role.count > 0)
+      .map((role) => ({ roleCode: role.roleCode, count: role.count }))
+
+    try {
+      const assignments = createRoleAssignments({ players, roles: activeRoles })
+      onPreview(assignments, activeRoles)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      setPreviewError(message ? `Rol dağıtımı oluşturulamadı. ${message}` : 'Rol dağıtımı oluşturulamadı.')
     }
   }
 
@@ -256,7 +277,6 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
               })}
             </div>
 
-
             <div className="rounded border border-slate-700 bg-slate-950 p-2">
               <p className="text-sm text-slate-300">
                 Seçilen roller: <span className="font-semibold">{totalRoles} / {playerCount}</span>
@@ -295,9 +315,22 @@ export function RoleConfigurationPanel({ roomId, playerCount, onClose }: RoleCon
               <p className="text-sm text-rose-400">{saveError}</p>
             )}
 
+            {previewError && (
+              <p className="text-sm text-rose-400">{previewError}</p>
+            )}
+
             {saveSuccess && (
               <p className="text-sm text-green-400">Rol konfigürasyonu kaydedildi.</p>
             )}
+
+            <Button
+              type="button"
+              disabled={!isConfigurationValid || isDisabled}
+              onClick={handlePreview}
+              className="w-full"
+            >
+              Dağıtımı Önizle
+            </Button>
 
             <Button
               type="button"

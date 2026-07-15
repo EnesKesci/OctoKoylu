@@ -38,14 +38,14 @@ export const ROLE_CATALOG: Record<RoleCode, RoleDefinition> = {
   },
   godfather: {
     code: 'godfather',
-    name: 'Godfather',
+    name: 'Baş Vampir',
     team: 'vampire',
     isUnique: true,
     shortDescription: 'Vampir takımının lideridir ve dedektife köylü takımından görünür.',
   },
   silencer: {
     code: 'silencer',
-    name: 'Silencer',
+    name: 'Susturucu',
     team: 'vampire',
     isUnique: true,
     shortDescription: 'Oyun boyunca bir oyuncunun ertesi gün konuşmasını engelleyebilir.',

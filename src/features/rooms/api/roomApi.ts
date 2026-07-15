@@ -269,3 +269,25 @@ export async function updateReadyStatus(input: UpdateReadyStatusInput): Promise<
   }
 }
 
+export async function updateRoomStatus(
+  roomId: string,
+  status: RoomStatus,
+): Promise<Room> {
+  const { data, error } = await supabase
+    .from('rooms')
+    .update({ status })
+    .eq('id', roomId)
+    .select('id, name, room_code, status, moderator_id')
+    .single()
+
+  if (error) {
+    throw createRoomApiError('Failed to update room status.', error.message)
+  }
+
+  if (!data) {
+    throw createRoomApiError('Failed to update room status. Empty response from database.')
+  }
+
+  return mapRoomRow(data as RoomRow)
+}
+

@@ -113,6 +113,7 @@ export default function LobbyPage() {
 
   async function onToggleReadyStatus() {
     if (isReadyUpdatingRef.current || !room || !user?.id || !currentPlayer) return
+    if (room.status !== 'lobby') return
 
     isReadyUpdatingRef.current = true
     setIsReadyUpdating(true)
@@ -181,6 +182,56 @@ export default function LobbyPage() {
     }
   }, [room])
 
+  // Realtime subscription for rooms table to sync status changes
+  useEffect(() => {
+    if (!room) return
+
+    let mounted = true
+    const isRefetchingRef = { current: false }
+
+    const channel = supabase
+      .channel(`room_status:${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` },
+        async () => {
+          if (!mounted) return
+          if (isRefetchingRef.current) return
+          isRefetchingRef.current = true
+          try {
+            const updatedRoom = await getRoomByCode(room.roomCode)
+            if (!mounted) return
+            if (updatedRoom) {
+              setRoom(updatedRoom)
+            }
+          } catch {
+            // keep existing room on realtime failure
+          } finally {
+            isRefetchingRef.current = false
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      void supabase.removeChannel(channel)
+    }
+  }, [room])
+
+  // Navigate to home when room is finished
+  useEffect(() => {
+    if (room?.status !== 'finished') return
+
+    const timeoutId = window.setTimeout(() => {
+      navigate('/', { replace: true })
+    }, 1500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [room?.status, navigate])
+
   if (isLoading) {
     return <p className="p-4">Oda yükleniyor...</p>
   }
@@ -191,6 +242,48 @@ export default function LobbyPage() {
 
   if (!room) {
     return <p className="p-4">Oda bulunamadı.</p>
+  }
+
+  const statusInfo = (() => {
+    switch (room.status) {
+      case 'lobby':
+        return {
+          title: 'Oyuncular bekleniyor',
+          description: 'Hazır olduğunda Hazır butonuna bas. Moderatör herkes hazır olduğunda rolleri dağıtacak.',
+        }
+      case 'role_assignment':
+        return {
+          title: 'Roller dağıtılıyor',
+          description: 'Moderatör rol dağıtımını hazırlıyor. Rolün hazır olduğunda burada gösterilecek.',
+        }
+      case 'in_progress':
+        return {
+          title: 'Oyun başladı',
+          description: 'Oyun devam ediyor. Rolünü ve takım bilgilerini rol ekranından takip edebilirsin.',
+        }
+      case 'finished':
+        return {
+          title: 'Oyun tamamlandı',
+          description: 'Bu oyun sona erdi.',
+        }
+    }
+  })()
+
+  const showReadyButton = room.status === 'lobby' || room.status === 'role_assignment'
+
+  if (room.status === 'finished') {
+    return (
+      <div className="p-4">
+        <Card className="border-slate-700 bg-slate-900">
+          <CardContent className="pt-6">
+            <p className="text-sm font-semibold text-white">Oda sonlandırıldı</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Moderatör odayı sonlandırdı. Ana ekrana yönlendiriliyorsun.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -206,6 +299,10 @@ export default function LobbyPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded border border-slate-700 bg-slate-950 p-3">
+            <p className="text-sm font-semibold text-white">{statusInfo.title}</p>
+            <p className="mt-1 text-xs text-slate-400">{statusInfo.description}</p>
+          </div>
           <div className="space-y-3">
             {players.map((p) => {
               const isModeratorPlayer = room?.moderatorId != null && p.userId === room.moderatorId
@@ -229,18 +326,32 @@ export default function LobbyPage() {
           </div>
         </CardContent>
       </Card>
-      {room && user?.id && !isModerator ? (
+      {room && user?.id && !isModerator && showReadyButton ? (
         <div className="p-4 space-y-3">
           {currentPlayer ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onToggleReadyStatus}
-              disabled={isReadyUpdating}
-            >
-              {isReadyUpdating ? 'Kaydediliyor...' : currentPlayer.isReady ? 'Bekle' : 'Hazır'}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onToggleReadyStatus}
+                disabled={isReadyUpdating || room.status !== 'lobby'}
+              >
+                {isReadyUpdating ? 'Kaydediliyor...' : currentPlayer.isReady ? 'Bekle' : 'Hazır'}
+              </Button>
+              {room.status === 'role_assignment' && (
+                <p className="text-xs text-slate-400">
+                  Rol dağıtımı başladığı için hazır durumun artık değiştirilemez.
+                </p>
+              )}
+            </>
           ) : null}
+          <Button type="button" variant="destructive" onClick={onLeaveRoom} disabled={isLeaving}>
+            {isLeaving ? 'Ayrılıyor...' : 'Odadan Ayrıl'}
+          </Button>
+        </div>
+      ) : null}
+      {room && user?.id && !isModerator && !showReadyButton ? (
+        <div className="p-4">
           <Button type="button" variant="destructive" onClick={onLeaveRoom} disabled={isLeaving}>
             {isLeaving ? 'Ayrılıyor...' : 'Odadan Ayrıl'}
           </Button>
