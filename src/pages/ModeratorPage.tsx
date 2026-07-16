@@ -5,15 +5,17 @@ import { getRoomByCode, getRoomPlayers, kickPlayer, updateRoomStatus } from '@/f
 import type { Room, Player } from '@/features/rooms/api/roomApi'
 import { RoleConfigurationPanel } from '@/features/roles/components/RoleConfigurationPanel'
 import { RoleAssignmentPreview } from '@/features/roles/components/RoleAssignmentPreview'
+import { DevelopmentRolePreview } from '@/features/roles/components/DevelopmentRolePreview'
 import { createRoleAssignments } from '@/features/roles'
 import type { RoleAssignment, RoleTemplateItem } from '@/features/roles'
+import { confirmRoomRoleAssignments } from '@/features/roles/api/roomRoleAssignmentApi'
 import { supabase } from '@/shared/lib/supabase'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ROOM_STATUS_LABELS } from '@/features/rooms/status'
-import { formatTime } from '@/shared/lib/fotmatTime'
+import { formatTime } from '@/shared/lib/formatTime'
 
 interface DevelopmentPlayer {
   id: string
@@ -39,6 +41,9 @@ export default function ModeratorPage() {
   const [showEndRoomConfirmation, setShowEndRoomConfirmation] = useState(false)
   const [isEndingRoom, setIsEndingRoom] = useState(false)
   const [endRoomError, setEndRoomError] = useState<string | null>(null)
+  const [isConfirmingAssignments, setIsConfirmingAssignments] = useState(false)
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const [developmentRolePreview, setDevelopmentRolePreview] = useState<RoleAssignment | null>(null)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -132,6 +137,58 @@ export default function ModeratorPage() {
     }
   }, [room])
 
+  // Realtime subscription for rooms table to sync status changes for moderator
+  useEffect(() => {
+    if (!room) return
+
+    let mounted = true
+    const isRefetchingRef = { current: false }
+
+    const channel = supabase
+      .channel(`moderator_room_status:${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` },
+        async () => {
+          if (!mounted) return
+          if (isRefetchingRef.current) return
+          isRefetchingRef.current = true
+          try {
+            const updatedRoom = await getRoomByCode(room.roomCode)
+            if (!mounted) return
+            if (updatedRoom) {
+              setRoom(updatedRoom)
+            }
+          } catch {
+            // keep existing room on realtime failure
+          } finally {
+            isRefetchingRef.current = false
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      void supabase.removeChannel(channel)
+    }
+  }, [room])
+
+  // Navigate to home when room is finished
+  useEffect(() => {
+    if (room?.status !== 'finished') return
+
+    setShowRolePanel(false)
+    setPreviewAssignments(null)
+    setPreviewRoles(null)
+    setPreviewActionError(null)
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
+    setShowEndRoomConfirmation(false)
+
+    navigate('/', { replace: true })
+  }, [room?.status, navigate])
+
   const nonModeratorPlayers = room ? players.filter((player) => player.userId !== room.moderatorId) : []
   const realReadyCount = nonModeratorPlayers.filter((player) => player.isReady).length
   const realPlayerCount = nonModeratorPlayers.length
@@ -160,6 +217,8 @@ export default function ModeratorPage() {
     setPreviewAssignments(null)
     setPreviewRoles(null)
     setPreviewActionError(null)
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
   }, [realAssignmentPlayerKey])
 
   const handleClosePanel = useCallback(async () => {
@@ -171,6 +230,8 @@ export default function ModeratorPage() {
       setPreviewAssignments(null)
       setPreviewRoles(null)
       setPreviewActionError(null)
+      setConfirmationError(null)
+      setDevelopmentRolePreview(null)
       setShowRolePanel(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Oda durumu güncellenirken bilinmeyen bir hata oluştu.'
@@ -213,6 +274,8 @@ export default function ModeratorPage() {
       setDevelopmentPlayers([])
       setEndRoomError(null)
       setShowEndRoomConfirmation(false)
+      setDevelopmentRolePreview(null)
+      setConfirmationError(null)
 
       navigate('/', { replace: true })
     } catch (err) {
@@ -227,6 +290,8 @@ export default function ModeratorPage() {
     setPreviewAssignments(null)
     setPreviewRoles(null)
     setPreviewActionError(null)
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
     setDevelopmentPlayers((prev) => {
       const missingCount = target - realPlayerCount
       if (missingCount <= 0) return []
@@ -244,6 +309,8 @@ export default function ModeratorPage() {
     setPreviewAssignments(null)
     setPreviewRoles(null)
     setPreviewActionError(null)
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
     setDevelopmentPlayers([])
   }, [])
 
@@ -251,16 +318,20 @@ export default function ModeratorPage() {
     setPreviewAssignments(assignments)
     setPreviewRoles(roles)
     setPreviewActionError(null)
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
   }, [])
 
   const handleRedistribute = useCallback(() => {
-    if (!previewRoles) return
+    if (!previewRoles || isConfirmingAssignments || isEndingRoom) return
 
     setPreviewActionError(null)
+    setConfirmationError(null)
 
     try {
       const assignments = createRoleAssignments({ players: assignmentPlayers, roles: previewRoles })
       setPreviewAssignments(assignments)
+      setDevelopmentRolePreview(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : ''
       setPreviewActionError(
@@ -269,13 +340,82 @@ export default function ModeratorPage() {
           : 'Rol dağıtımı yeniden oluşturulamadı.',
       )
     }
-  }, [assignmentPlayers, previewRoles])
+  }, [assignmentPlayers, previewRoles, isConfirmingAssignments, isEndingRoom])
 
   const handleBackFromPreview = useCallback(() => {
+    if (isConfirmingAssignments) return
+
     setPreviewAssignments(null)
     setPreviewRoles(null)
     setPreviewActionError(null)
-  }, [])
+    setConfirmationError(null)
+    setDevelopmentRolePreview(null)
+  }, [isConfirmingAssignments])
+
+  const handleConfirmAssignments = useCallback(async () => {
+    const hasDevelopmentAssignments = previewAssignments?.some(
+      (assignment) => assignment.playerId.startsWith('dev-player-'),
+    ) ?? false
+
+    if (
+      !room ||
+      !previewAssignments?.length ||
+      room.status !== 'role_assignment' ||
+      hasDevelopmentAssignments ||
+      isConfirmingAssignments ||
+      isEndingRoom
+    ) {
+      return
+    }
+
+    setIsConfirmingAssignments(true)
+    setConfirmationError(null)
+
+    try {
+      const assignments = previewAssignments.map((assignment) => ({
+        userId: assignment.playerId,
+        roleCode: assignment.roleCode,
+      }))
+
+      const updatedRoom = await confirmRoomRoleAssignments({
+        roomId: room.id,
+        assignments,
+      })
+
+      setRoom(updatedRoom)
+      setShowRolePanel(false)
+      setPreviewAssignments(null)
+      setPreviewRoles(null)
+      setPreviewActionError(null)
+      setConfirmationError(null)
+      setDevelopmentRolePreview(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      setConfirmationError(
+        message
+          ? `Rol dağıtımı onaylanamadı. ${message}`
+          : 'Rol dağıtımı onaylanamadı.',
+      )
+    } finally {
+      setIsConfirmingAssignments(false)
+    }
+  }, [room, previewAssignments, isConfirmingAssignments, isEndingRoom])
+
+  const hasDevelopmentAssignments = previewAssignments?.some((assignment) =>
+    assignment.playerId.startsWith('dev-player-'),
+  ) ?? false
+
+  const canConfirmAssignments =
+    Boolean(previewAssignments?.length) &&
+    !hasDevelopmentAssignments &&
+    room?.status === 'role_assignment' &&
+    !isConfirmingAssignments &&
+    !isEndingRoom
+
+  const confirmDisabledReason =
+    hasDevelopmentAssignments && previewAssignments?.length
+      ? 'Fake oyuncularla oluşturulan dağıtımlar yalnızca test amaçlıdır ve onaylanamaz.'
+      : undefined
 
   if (isLoading) {
     return <p className="p-4">Oda yükleniyor...</p>
@@ -399,13 +539,33 @@ export default function ModeratorPage() {
               </CardContent>
             </Card>
           )}
-          {previewAssignments ? (
+          {developmentRolePreview && previewAssignments ? (
+            <div className="mt-4">
+              <DevelopmentRolePreview
+                assignment={developmentRolePreview}
+                allAssignments={previewAssignments}
+                onBack={() => {
+                  setConfirmationError(null)
+                  setDevelopmentRolePreview(null)
+                }}
+              />
+            </div>
+          ) : previewAssignments ? (
             <div className="mt-4">
               <RoleAssignmentPreview
                 assignments={previewAssignments}
                 error={previewActionError}
+                confirmationError={confirmationError}
+                isConfirming={isConfirmingAssignments}
+                canConfirm={canConfirmAssignments}
+                confirmDisabledReason={confirmDisabledReason}
                 onRedistribute={handleRedistribute}
                 onBack={handleBackFromPreview}
+                onConfirm={handleConfirmAssignments}
+                onPreviewPlayerRole={(assignment) => {
+                  setConfirmationError(null)
+                  setDevelopmentRolePreview(assignment)
+                }}
               />
             </div>
           ) : showRolePanel ? (
@@ -448,13 +608,14 @@ export default function ModeratorPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={isKicking || isBusy}
+                        disabled={isKicking || isBusy || room.status !== 'lobby'}
                         onClick={async () => {
                           if (!playerId) {
                             setError('Oyuncunun kullanıcı kimliği bulunamadı.')
                             return
                           }
                           if (isKicking) return
+                          if (room.status !== 'lobby') return
                           setError(null)
                           setKickingPlayerIds((ids) => (ids.includes(playerId) ? ids : [...ids, playerId]))
                           try {

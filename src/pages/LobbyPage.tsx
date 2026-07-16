@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { getInitials } from '@/shared/lib/getInitials'
-import { formatTime } from '@/shared/lib/fotmatTime'
+import { formatTime } from '@/shared/lib/formatTime'
 
 export default function LobbyPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
@@ -219,6 +219,14 @@ export default function LobbyPage() {
       void supabase.removeChannel(channel)
     }
   }, [room])
+
+  // Navigate to role page when room is in_progress
+  useEffect(() => {
+    if (!room || room.status !== 'in_progress') return
+    if (room.moderatorId != null && user?.id === room.moderatorId) return
+
+    navigate(`/rooms/${room.roomCode}/my-role`, { replace: true })
+  }, [room?.status, room?.roomCode, room?.moderatorId, user?.id, navigate])
 
   // Navigate to home when room is finished
   useEffect(() => {
